@@ -57,7 +57,7 @@ NotificationService (Port 5004)
 ├─────────────────────────────────────────────────────────┤
 │ ✅ SQL Server (OrderService DB)      Port: 1433       │
 │ ✅ MongoDB (ProductCatalogService)   Port: 27017      │
-│ ✅ PostgreSQL (InventoryService)     Port: 5432       │
+│ ✅ Redis (InventoryService)          Port: 6379       │
 │ ✅ 4 Service Containers              Ports: 5001-5004 │
 │ ✅ Nginx API Gateway                 Port: 8080       │
 │ ✅ Docker Network                    microservices-net│
@@ -77,7 +77,7 @@ NotificationService (Port 5004)
 | **PROJECT-STRUCTURE.md** | File organization | Developers |
 | **ADR-001.md** | SQL Server decision | Architects |
 | **ADR-002.md** | MongoDB decision | Architects |
-| **ADR-003.md** | PostgreSQL decision | Architects |
+| **ADR-003.md** | Redis decision | Architects |
 | **ADR-004.md** | Stateless decision | Architects |
 | **IMPLEMENTATION-SUMMARY.md** | Complete summary | Managers |
 
@@ -98,12 +98,12 @@ docker-compose up --build -d
 ### Architecture Decisions
 - ✅ **SQL Server** for OrderService (ACID for money)
 - ✅ **MongoDB** for ProductCatalogService (flexible schema)
-- ✅ **PostgreSQL** for InventoryService (lightweight relational)
+- ✅ **Redis** for InventoryService (in-memory, fast)
 - ✅ **Stateless** NotificationService (infinite scaling)
 
 ### Implementation
 - ✅ Complete REST APIs on each service
-- ✅ Database migrations (SQL Server + PostgreSQL)
+- ✅ Database migrations (SQL Server)
 - ✅ Swagger documentation on each service
 - ✅ Structured logging with Serilog
 - ✅ Dependency injection setup
@@ -129,7 +129,7 @@ docker-compose up --build -d
 ### Task 2.2: Database-per-Service ✅
 ```
 OrderService DB ≠ ProductCatalog DB ≠ Inventory DB ≠ None
-(SQL Server)      (MongoDB)           (PostgreSQL)    (Stateless)
+(SQL Server)      (MongoDB)           (Redis)    (Stateless)
 ```
 No cross-service database access
 
@@ -141,7 +141,7 @@ No cross-service database access
 ### Task 2.4: ADRs Written ✅
 - ADR-001: OrderService - Why SQL Server
 - ADR-002: ProductCatalog - Why MongoDB
-- ADR-003: Inventory - Why PostgreSQL
+- ADR-003: Inventory - Why Redis
 - ADR-004: Notification - Why Stateless
 
 ---
@@ -202,7 +202,7 @@ docker-compose logs -f
 ### Source Code
 - `OrderService/` - 9 files (Controllers, BLL, DAL, Models, etc.)
 - `ProductCatalogService/` - 9 files (MongoDB integration)
-- `InventoryService/` - 10 files (PostgreSQL integration)
+- `InventoryService/` - 10 files (Redis integration)
 - `NotificationService/` - 8 files (Stateless)
 
 ### Configuration
@@ -216,7 +216,7 @@ docker-compose logs -f
 
 ### Database
 - 2 × Migration files (SQL Server)
-- 2 × Migration files (PostgreSQL)
+- 2 × Migration files (previously PostgreSQL; Inventory now uses Redis)
 - Schema snapshots
 
 ### Documentation
@@ -236,7 +236,7 @@ docker-compose logs -f
 
 ### Technologies
 - Microservices architecture
-- Polyglot persistence (SQL, MongoDB, PostgreSQL)
+- Polyglot persistence (SQL, MongoDB, Redis)
 - Docker & Docker Compose
 - Nginx reverse proxy
 - REST APIs

@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY ["InventoryService/InventoryService.csproj", "InventoryService/"]
+# RUN --network=host dotnet restore "InventoryService/InventoryService.csproj" # unsupported on Docker Desktop Windows build
 RUN dotnet restore "InventoryService/InventoryService.csproj"
 COPY . .
 WORKDIR "/src/InventoryService"

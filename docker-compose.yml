@@ -1,3 +1,140 @@
+# # services:
+# #   # ==================== ORDER SERVICE ====================
+# #   order-db:
+# #     image: mcr.microsoft.com/mssql/server:2022-latest
+# #     environment:
+# #       SA_PASSWORD: YourStrong!Password
+# #       ACCEPT_EULA: "Y"
+# #     ports:
+# #       - "1433:1433"
+# #     volumes:
+# #       - order-db-data:/var/opt/mssql
+# #     healthcheck:
+# #       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong!Password' -C -Q 'SELECT 1' >/dev/null 2>&1 || exit 1"]
+# #       interval: 10s
+# #       timeout: 20s
+# #       retries: 10
+# #       start_period: 30s
+# #     networks:
+# #       - microservices-network
+
+# #   order-service:
+# #     build:
+# #       context: .
+# #       dockerfile: ./OrderService/Dockerfile
+# #     ports:
+# #       - "5001:80"
+# #     environment:
+# #       - ASPNETCORE_ENVIRONMENT=Development
+# #       - ASPNETCORE_URLS=http://+:80
+# #       - ConnectionStrings__OrderDbConnection=Server=order-db;Database=OrderDB;User Id=sa;Password=YourStrong!Password;Encrypt=false;
+# #     depends_on:
+# #       order-db:
+# #         condition: service_healthy
+# #     networks:
+# #       - microservices-network
+
+# #   # ==================== PRODUCT CATALOG SERVICE (MongoDB) ====================
+# #   mongo:
+# #     image: mongo:7.0
+# #     environment:
+# #       MONGO_INITDB_ROOT_USERNAME: admin
+# #       MONGO_INITDB_ROOT_PASSWORD: adminpassword
+# #     ports:
+# #       - "27017:27017"
+# #     volumes:
+# #       - mongo-data:/data/db
+# #     networks:
+# #       - microservices-network
+
+# #   product-catalog-service:
+# #     build:
+# #       context: .
+# #       dockerfile: ./ProductCatalogService/Dockerfile
+# #       network: host # <-- מאפשר גישה לאינטרנט לצורך dotnet restore
+# #     ports:
+# #       - "5002:80"
+# #     environment:
+# #       - ASPNETCORE_ENVIRONMENT=Development
+# #       - ASPNETCORE_URLS=http://+:80
+# #       - ConnectionStrings__MongoDbConnection=mongodb://admin:adminpassword@mongo:27017
+# #     depends_on:
+# #       - mongo
+# #     networks:
+# #       - microservices-network
+
+# #   # ==================== INVENTORY SERVICE (Redis) ====================
+# #   redis:
+# #     image: redis:7-alpine
+# #     ports:
+# #       - "6379:6379"
+# #     volumes:
+# #       - redis-data:/data
+# #     healthcheck:
+# #       test: ["CMD", "redis-cli", "ping"]
+# #       interval: 10s
+# #       timeout: 5s
+# #       retries: 5
+# #     networks:
+# #       - microservices-network
+
+# #   inventory-service:
+# #     build:
+# #       context: .
+# #       dockerfile: ./InventoryService/Dockerfile
+# #       network: host # <-- מאפשר גישה לאינטרנט לצורך dotnet restore
+# #     ports:
+# #       - "5003:80"
+# #     environment:
+# #       - ASPNETCORE_ENVIRONMENT=Development
+# #       - ASPNETCORE_URLS=http://+:80
+# #       - ConnectionStrings__RedisConnection=redis:6379
+# #     depends_on:
+# #       redis:
+# #         condition: service_healthy
+# #     networks:
+# #       - microservices-network
+
+# #   # ==================== NOTIFICATION SERVICE ====================
+# #   notification-service:
+# #     build:
+# #       context: .
+# #       dockerfile: ./NotificationService/Dockerfile
+# #       network: host # <-- מאפשר גישה לאינטרנט לצורך dotnet restore
+# #     ports:
+# #       - "5004:80"
+# #     environment:
+# #       - ASPNETCORE_ENVIRONMENT=Development
+# #       - ASPNETCORE_URLS=http://+:80
+# #     networks:
+# #       - microservices-network
+
+# #   # ==================== API GATEWAY (Nginx - Phase 3) ====================
+# #   api-gateway:
+# #     image: nginx:alpine
+# #     ports:
+# #       - "8080:80"
+# #     volumes:
+# #       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+# #     depends_on:
+# #       - order-service
+# #       - product-catalog-service
+# #       - inventory-service
+# #       - notification-service
+# #     networks:
+# #       - microservices-network
+
+# # volumes:
+# #   order-db-data:
+# #   mongo-data:
+# #   redis-data:
+
+# # networks:
+# #   microservices-network:
+# #     driver: bridge
+
+# version: '3.4'
+
 # services:
 #   # ==================== ORDER SERVICE ====================
 #   order-db:
@@ -22,10 +159,10 @@
 #     build:
 #       context: .
 #       dockerfile: ./OrderService/Dockerfile
-#     ports:
-#       - "5001:80"
+#     # ה-ports הוסרו כדי למנוע גישה ישירה מחוץ לדוקר
 #     environment:
-#       - ASPNETCORE_ENVIRONMENT=Docker
+#       - ASPNETCORE_ENVIRONMENT=Development
+#       - ASPNETCORE_URLS=http://+:80
 #       - ConnectionStrings__OrderDbConnection=Server=order-db;Database=OrderDB;User Id=sa;Password=YourStrong!Password;Encrypt=false;
 #     depends_on:
 #       order-db:
@@ -46,15 +183,33 @@
 #     networks:
 #       - microservices-network
 
-#   product-catalog-service:
+#   product-catalog-service-1:
 #     build:
 #       context: .
 #       dockerfile: ./ProductCatalogService/Dockerfile
-#     ports:
-#       - "5002:80"
+#       network: host
+#     # ה-ports הוסרו כדי למנוע גישה ישירה מחוץ לדוקר
 #     environment:
-#       - ASPNETCORE_ENVIRONMENT=Docker
+#       - ASPNETCORE_ENVIRONMENT=Development
+#       - ASPNETCORE_URLS=http://+:80
 #       - ConnectionStrings__MongoDbConnection=mongodb://admin:adminpassword@mongo:27017
+#       - CONTAINER_NAME=Replica-1
+#     depends_on:
+#       - mongo
+#     networks:
+#       - microservices-network
+
+#   product-catalog-service-2:
+#     build:
+#       context: .
+#       dockerfile: ./ProductCatalogService/Dockerfile
+#       network: host
+#     # ה-ports הוסרו כדי למנוע גישה ישירה מחוץ לדוקר
+#     environment:
+#       - ASPNETCORE_ENVIRONMENT=Development
+#       - ASPNETCORE_URLS=http://+:80
+#       - ConnectionStrings__MongoDbConnection=mongodb://admin:adminpassword@mongo:27017
+#       - CONTAINER_NAME=Replica-2
 #     depends_on:
 #       - mongo
 #     networks:
@@ -79,10 +234,11 @@
 #     build:
 #       context: .
 #       dockerfile: ./InventoryService/Dockerfile
-#     ports:
-#       - "5003:80"
+#       network: host
+#     # ה-ports הוסרו כדי למנוע גישה ישירה מחוץ לדוקר
 #     environment:
-#       - ASPNETCORE_ENVIRONMENT=Docker
+#       - ASPNETCORE_ENVIRONMENT=Development
+#       - ASPNETCORE_URLS=http://+:80
 #       - ConnectionStrings__RedisConnection=redis:6379
 #     depends_on:
 #       redis:
@@ -95,23 +251,25 @@
 #     build:
 #       context: .
 #       dockerfile: ./NotificationService/Dockerfile
-#     ports:
-#       - "5004:80"
+#       network: host
+#     # ה-ports הוסרו כדי למנוע גישה ישירה מחוץ לדוקר
 #     environment:
-#       - ASPNETCORE_ENVIRONMENT=Docker
+#       - ASPNETCORE_ENVIRONMENT=Development
+#       - ASPNETCORE_URLS=http://+:80
 #     networks:
 #       - microservices-network
 
-#   # ==================== API GATEWAY (Nginx - Phase 3) ====================
+#   # ==================== API GATEWAY (YARP - Phase 3) ====================
 #   api-gateway:
-#     image: nginx:alpine
+#     build:
+#       context: .
+#       dockerfile: ./ApiGateway/Dockerfile
 #     ports:
-#       - "8080:80"
-#     volumes:
-#       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+#       - "8080:80" # הכתובת החיצונית היחידה דרכה ניגשים למערכת כולה
 #     depends_on:
 #       - order-service
-#       - product-catalog-service
+#       - product-catalog-service-1
+#       - product-catalog-service-2
 #       - inventory-service
 #       - notification-service
 #     networks:
@@ -126,6 +284,8 @@
 #   microservices-network:
 #     driver: bridge
 
+
+version: '3.4'
 
 services:
   # ==================== ORDER SERVICE ====================
@@ -151,8 +311,6 @@ services:
     build:
       context: .
       dockerfile: ./OrderService/Dockerfile
-    ports:
-      - "5001:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
@@ -176,16 +334,29 @@ services:
     networks:
       - microservices-network
 
-  product-catalog-service:
+  product-catalog-service-1:
     build:
       context: .
       dockerfile: ./ProductCatalogService/Dockerfile
-    ports:
-      - "5002:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__MongoDbConnection=mongodb://admin:adminpassword@mongo:27017
+      - CONTAINER_NAME=Replica-1
+    depends_on:
+      - mongo
+    networks:
+      - microservices-network
+
+  product-catalog-service-2:
+    build:
+      context: .
+      dockerfile: ./ProductCatalogService/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__MongoDbConnection=mongodb://admin:adminpassword@mongo:27017
+      - CONTAINER_NAME=Replica-2
     depends_on:
       - mongo
     networks:
@@ -210,8 +381,6 @@ services:
     build:
       context: .
       dockerfile: ./InventoryService/Dockerfile
-    ports:
-      - "5003:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
@@ -227,24 +396,26 @@ services:
     build:
       context: .
       dockerfile: ./NotificationService/Dockerfile
-    ports:
-      - "5004:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
     networks:
       - microservices-network
 
-  # ==================== API GATEWAY (Nginx - Phase 3) ====================
+  # ==================== API GATEWAY (YARP - Phase 3) ====================
   api-gateway:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: ./ApiGateway/Dockerfile
     ports:
-      - "8080:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - "8080:80" # מאפשר גישה מבחוץ דרך פורט 8080
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development # תיקון: מפעיל סוואגר בדוקר
+      - ASPNETCORE_URLS=http://+:80        # תיקון: מאזין פנימית לפורט 80 שמתאים למיפוי
     depends_on:
       - order-service
-      - product-catalog-service
+      - product-catalog-service-1          # תיקון: עודכן השם של הרפליקה הראשונה
+      - product-catalog-service-2          # תיקון: עודכן השם של הרפליקה השנייה
       - inventory-service
       - notification-service
     networks:

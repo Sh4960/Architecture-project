@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY ["NotificationService/NotificationService.csproj", "NotificationService/"]
+# RUN --network=host dotnet restore "NotificationService/NotificationService.csproj" # unsupported on Docker Desktop Windows build
 RUN dotnet restore "NotificationService/NotificationService.csproj"
 COPY . .
 WORKDIR "/src/NotificationService"

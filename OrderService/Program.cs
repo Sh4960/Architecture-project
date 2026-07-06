@@ -30,6 +30,7 @@ builder.Services.AddDbContext<OrderDbContext>(options =>
 // ======== Dependency Injection ========
 builder.Services.AddScoped<IOrderDAL, OrderDAL>();
 builder.Services.AddScoped<IOrderBLLService, OrderBLLService>();
+builder.Services.AddHttpClient<OrderBLLService>();
 
 // ======== Controllers & Swagger ========
 builder.Services.AddControllers();
@@ -45,11 +46,11 @@ using (var scope = app.Services.CreateScope())
     dbContext.Database.Migrate();
 }
 
-if (app.Environment.IsDevelopment())
-{
+//if (app.Environment.IsDevelopment())
+//{
     app.UseSwagger();
     app.UseSwaggerUI();
-}
+//}
 
 app.UseHttpsRedirection();
 app.UseAuthorization();

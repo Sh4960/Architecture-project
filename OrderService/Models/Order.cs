@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace OrderService.Models
 {
     public class Order
@@ -17,6 +19,7 @@ namespace OrderService.Models
         public int ProductId { get; set; } // From ProductCatalogService
         public int Quantity { get; set; }
         public decimal Price { get; set; }
+        [JsonIgnore]
         public Order Order { get; set; } = null!;
     }
 }

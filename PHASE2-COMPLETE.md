@@ -11,7 +11,7 @@
 ### 4 Microservices
 1. **OrderService** (Port 5001) → SQL Server → ACID עבור כסף
 2. **ProductCatalogService** (Port 5002) → MongoDB → Schema גמיש
-3. **InventoryService** (Port 5003) → PostgreSQL → Stock tracking
+3. **InventoryService** (Port 5003) → Redis → In-memory stock tracking
 4. **NotificationService** (Port 5004) → Stateless → Email notifications
 
 ### Infrastructure
@@ -35,7 +35,7 @@
 |---------|----------|------|------|
 | OrderService | SQL Server | Relational | ACID, transactions, כסף |
 | ProductCatalogService | MongoDB | Document | Flexible schema, attributes שונים |
-| InventoryService | PostgreSQL | Relational | Lightweight, polyglot learning |
+| InventoryService | Redis | In-Memory (NoSQL) | Ultra-fast key-value store |
 | NotificationService | None | Stateless | Horizontal scaling ∞ |
 
 ---
@@ -76,7 +76,7 @@ curl http://localhost:8080/api/products
    (Port 5001)      (Port 5002)           (Port 5003)
        │                  │                    │
        ▼                  ▼                    ▼
-   SQL Server         MongoDB            PostgreSQL
+    SQL Server         MongoDB            Redis
    (ACID)            (Docs)            (Relational)
 
        │
@@ -99,7 +99,7 @@ NotificationService (Port 5004) - Stateless
 
 ```
 ✅ 4 Microservices (Controllers, BLL, DAL each)
-✅ 3 Database containers (SQL Server, MongoDB, PostgreSQL)
+✅ 3 Database containers (SQL Server, MongoDB, Redis)
 ✅ 1 API Gateway (Nginx)
 ✅ docker-compose.yml (full orchestration)
 ✅ 4 Dockerfiles (multi-stage builds)
@@ -127,7 +127,7 @@ OrderService DATABASE ≠ ProductCatalogService DATABASE ≠ InventoryService DA
 "Right tool for the job" - לא SQL לכולם:
 - **Money** (Orders) → SQL Server (ACID)
 - **Products** (Flexible) → MongoDB (Documents)
-- **Inventory** (Simple) → PostgreSQL (Relational)
+- **Inventory** (Simple) → Redis (In-Memory)
 - **Notifications** (Temporary) → None (Stateless)
 
 ### API Gateway
@@ -160,7 +160,7 @@ Nginx (localhost:8080)
 ### Database Ports
 - SQL Server: **1433**
 - MongoDB: **27017**
-- PostgreSQL: **5432**
+- Redis: **6379**
 
 ---
 
@@ -175,7 +175,7 @@ Nginx (localhost:8080)
 
 ### After (Microservices)
 ```
-✅ 3 databases (SQL, Mongo, PostgreSQL)
+✅ 3 databases (SQL, Mongo, Redis)
 ✅ 4 services (scale independently)
 ✅ Loosely coupled
 ✅ Deployable separately

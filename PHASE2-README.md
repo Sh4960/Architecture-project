@@ -8,8 +8,8 @@ This is the evolution of the monolithic e-commerce system into a **production-gr
 │                     NGINX API Gateway (Port 8080)              │
 │                   Reverse Proxy & Load Balancer                 │
 └──────┬──────────────────┬──────────────────────────┬────────────┘
-       │                  │                          │
-       ▼                  ▼                          ▼
+  │                  │                          │
+  ▼                  ▼                          ▼
 ┌──────────────┐  ┌──────────────────┐  ┌──────────────────┐
 │ ORDER        │  │ PRODUCT CATALOG  │  │ INVENTORY        │
 │ SERVICE      │  │ SERVICE          │  │ SERVICE          │
@@ -22,19 +22,19 @@ This is the evolution of the monolithic e-commerce system into a **production-gr
 │   orders/id  │  │   products       │  │   inventories/   │
 │              │  │ - PUT /api/      │  │   reserve        │
 └──────┬───────┘  │   products/id    │  │ - POST /api/     │
-       │          └─────────┬────────┘  │   inventories/   │
-       │                    │            │   release        │
-       ▼                    ▼            ▼
+  │          └─────────┬────────┘  │   inventories/   │
+  │                    │            │   release        │
+  ▼                    ▼            ▼
 ┌──────────────────┐  ┌──────────────┐  ┌──────────────────┐
-│   SQL Server     │  │   MongoDB    │  │   PostgreSQL     │
-│   (Order DB)     │  │   (Products) │  │   (Inventory DB) │
+│   SQL Server     │  │   MongoDB    │  │     Redis        │
+│   (Order DB)     │  │   (Products) │  │   (Inventory)    │
 │ - Orders         │  │ - Products   │  │ - Inventories    │
-│ - OrderItems     │  │   (flexible  │  │   (simple schema)│
-│                  │  │   schema)    │  │                  │
+│ - OrderItems     │  │   (flexible  │  │   (in-memory KV) │
+│                  │  │   schema)    │  │   (fast reads)   │
 └──────────────────┘  └──────────────┘  └──────────────────┘
 
-       │
-       ▼
+  │
+  ▼
 ┌──────────────────────────────────────┐
 │  NOTIFICATION SERVICE (Port 5004)   │
 │  - Stateless (No Database)          │
@@ -88,9 +88,9 @@ PUT    /api/products/{id}             → Update product
 
 ---
 
-### 3. InventoryService (PostgreSQL - Relational)
-**Database**: PostgreSQL  
-**Ports**: 5003 (API), 5432 (DB)  
+### 3. InventoryService (Redis - In-Memory Store)
+**Database**: Redis  
+**Ports**: 5003 (API), 6379 (DB)  
 **Responsibilities**:
 - Track product quantities
 - Reserve inventory when orders are placed
@@ -105,7 +105,7 @@ POST   /api/inventories/release               → Release stock
 GET    /api/inventories/check/{productId}/{qty} → Check availability
 ```
 
-**Why PostgreSQL?** → Lightweight relational database, perfect for simple schema. Different from SQL Server demonstrates polyglot persistence. See [ADR-003](ADR-003-Inventory-PostgreSQL.md)
+**Why Redis?** → Ultra-fast in-memory key-value store, perfect for inventory data with frequent reads/writes. NoSQL demonstrates polyglot persistence. See [ADR-003](ADR-003-Inventory-Redis.md)
 
 ---
 
@@ -133,29 +133,42 @@ Each service owns its database. **NO cross-service database access**.
 | Service | Database | Type | Connection |
 |---------|----------|------|-----------|
 | OrderService | Order DB (SQL Server) | Relational, ACID | `Server=order-db;Database=OrderDB;...` |
-| ProductCatalogService | ProductCatalog (MongoDB) | Document Store | `mongodb://admin:pass@mongo:27017` |
-| InventoryService | Inventory DB (PostgreSQL) | Relational | `Host=inventory-db;Database=InventoryDB;...` |
+| ProductCatalogService | ProductCatalog (MongoDB) | Document Store (NoSQL) | `mongodb://admin:adminpassword@mongo:27017` |
+| InventoryService | Inventory (Redis) | In-Memory Store (NoSQL) | `redis:6379` |
 | NotificationService | None | Stateless | N/A |
 
 ## Polyglot Persistence
 
-We use **3 different database families** in Phase 2:
+We use **4 different persistence paradigms** in Phase 2:
 
-1. **Relational Databases**
-   - SQL Server (OrderService) - Strong ACID for financial data
-   - PostgreSQL (InventoryService) - Lightweight relational
+1. **Relational Database (SQL)**
+   - SQL Server (OrderService) - Strong ACID for financial transactions
    
-2. **Document Store**
+2. **Document Store (NoSQL)**
    - MongoDB (ProductCatalogService) - Flexible schema for varying product types
 
-3. **No Database**
-   - NotificationService - Stateless, horizontally scalable
+3. **In-Memory Cache (NoSQL)**
+   - Redis (InventoryService) - Ultra-fast key-value store for inventory tracking
+
+4. **Stateless**
+   - NotificationService - No database, horizontally scalable
 
 **Why this mix?**
 - **Right tool for the job** vs one-size-fits-all monolith
 - **Scalability**: Each service optimized for its workload
 - **Independent scaling**: Scale ProductCatalogService for reads, OrderService for transactions
 - **Team learning**: Exposure to multiple database paradigms
+
+---
+
+## מסדי נתונים בשלב 2
+בסוף השתמשנו ב:
+- **SQL Server** עבור `OrderService` (Relational ACID)
+- **MongoDB** עבור `ProductCatalogService` (NoSQL Document Store)
+- **Redis** עבור `InventoryService` (NoSQL In-Memory Cache)
+- **אין בסיס נתונים** עבור `NotificationService` (סטטלי)
+
+**סה"כ: 1 Relational DB + 2 NoSQL DBs + 1 Stateless Service**
 
 ---
 
@@ -173,7 +186,7 @@ docker-compose up -d
 This will:
 1. Create SQL Server instance for OrderService
 2. Create MongoDB instance for ProductCatalogService
-3. Create PostgreSQL instance for InventoryService
+3. Create Redis instance for InventoryService
 4. Start all 4 microservices
 5. Start Nginx API Gateway
 
@@ -259,7 +272,7 @@ curl -X POST http://localhost:8080/api/notifications/order-confirmed \
 
 - [ADR-001: OrderService - SQL Server](ADR-001-OrderService-SqlServer.md)
 - [ADR-002: ProductCatalogService - MongoDB](ADR-002-ProductCatalog-MongoDB.md)
-- [ADR-003: InventoryService - PostgreSQL](ADR-003-Inventory-PostgreSQL.md)
+- [ADR-003: InventoryService - Redis](ADR-003-Inventory-Redis.md)
 - [ADR-004: NotificationService - Stateless](ADR-004-NotificationService-Stateless.md)
 
 ---
@@ -300,7 +313,7 @@ docker-compose ps
 # Check database credentials
 # SQL Server: sa / YourStrong!Password
 # MongoDB: admin / adminpassword
-# PostgreSQL: postgres / postgres123
+# Redis: default (no auth) — default port 6379
 ```
 
 ### API Gateway not routing?

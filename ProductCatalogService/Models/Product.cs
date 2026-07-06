@@ -6,7 +6,7 @@ namespace ProductCatalogService.Models
     /// </summary>
     public class Product
     {
-        public string Id { get; set; } = null!; // MongoDB ObjectId
+        public int Id { get; set; } // Numeric ID
         public string Name { get; set; } = null!;
         public string Category { get; set; } = null!;
         public decimal Price { get; set; }

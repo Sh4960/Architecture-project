@@ -1,6 +1,8 @@
+using Microsoft.Extensions.Logging;
 using OrderService.BLL.Interfaces;
 using OrderService.DAL.Interfaces;
 using OrderService.Models;
+using System.Net.Http.Json;
 
 namespace OrderService.BLL
 {
@@ -8,11 +10,13 @@ namespace OrderService.BLL
     {
         private readonly IOrderDAL _orderDAL;
         private readonly ILogger<OrderBLLService> _logger;
+        private readonly HttpClient _httpClient;
 
-        public OrderBLLService(IOrderDAL orderDAL, ILogger<OrderBLLService> logger)
+        public OrderBLLService(IOrderDAL orderDAL, ILogger<OrderBLLService> logger, HttpClient httpClient)
         {
             _orderDAL = orderDAL;
             _logger = logger;
+            _httpClient = httpClient;
         }
 
         public async Task<Order?> GetOrderByIdAsync(int orderId)
@@ -58,9 +62,49 @@ namespace OrderService.BLL
             if (order == null)
                 throw new Exception($"Order {orderId} not found");
 
-            order.Status = "Confirmed";
-            _logger.LogInformation($"Confirming order {orderId}");
-            return await _orderDAL.UpdateOrderAsync(order);
+            try
+            {
+                _logger.LogInformation($"Attempting to reserve inventory for order {orderId} with {order.Items.Count} types of items");
+
+                // 1. הכנת אובייקט בקשה מרוכז המכיל את כל הפריטים יחד
+                var batchReserveRequest = order.Items.Select(item => new
+                {
+                    ProductId = item.ProductId,
+                    Quantity = item.Quantity
+                }).ToList();
+
+                // 2. פנייה יחידה לשירות המלאי בנתיב המקבל רשימה (Batch)
+                // משתמש בשם ה-DNS של הקונטיינר בתוך רשת הדוקר
+                var response = await _httpClient.PostAsJsonAsync(
+                    "http://inventory-service/api/inventories/reserve-batch", 
+                    batchReserveRequest
+                );
+
+                // 3. בדיקת סטטוס התשובה
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError($"Failed to reserve inventory for order {orderId}: {errorContent}");
+                    
+                    // במקרה של כישלון - אנו מעדכנים את סטטוס ההזמנה לנדחה (נצרך לחלק 2/3)
+                    order.Status = "Rejected";
+                    await _orderDAL.UpdateOrderAsync(order);
+                    
+                    throw new Exception($"Inventory reservation failed: {errorContent}");
+                }
+
+                _logger.LogInformation($"Successfully reserved all items for order {orderId}");
+
+                // 4. אם הכל הצליח - אישור ההזמנה ושמירה
+                order.Status = "Confirmed";
+                _logger.LogInformation($"Confirming order {orderId}");
+                return await _orderDAL.UpdateOrderAsync(order);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error confirming order {orderId}: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task<Order> RejectOrderAsync(int orderId)

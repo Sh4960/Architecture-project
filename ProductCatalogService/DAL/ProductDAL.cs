@@ -19,10 +19,22 @@ namespace ProductCatalogService.DAL
 
         public async Task<Product?> GetProductByIdAsync(string productId)
         {
-            var objectId = ObjectId.Parse(productId);
-            return await _productsCollection
-                .Find(p => p.Id == productId)
-                .FirstOrDefaultAsync();
+            try
+            {
+                if (int.TryParse(productId, out int id))
+                {
+                    return await _productsCollection
+                        .Find(p => p.Id == id)
+                        .FirstOrDefaultAsync();
+                }
+                _logger.LogWarning($"Invalid product id format: {productId}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error getting product by id {productId}: {ex.Message}");
+                return null;
+            }
         }
 
         public async Task<List<Product>> GetProductsByCategoryAsync(string category)
@@ -34,10 +46,16 @@ namespace ProductCatalogService.DAL
 
         public async Task<Product> CreateProductAsync(Product product)
         {
-            product.Id = ObjectId.GenerateNewId().ToString();
+            // Generate next numeric ID
+            var maxIdProduct = await _productsCollection
+                .Find(p => true)
+                .Sort(Builders<Product>.Sort.Descending(p => p.Id))
+                .FirstOrDefaultAsync();
+            
+            product.Id = (maxIdProduct?.Id ?? 0) + 1;
             product.CreatedAt = DateTime.UtcNow;
             
-            _logger.LogInformation($"Creating product in MongoDB: {product.Name}");
+            _logger.LogInformation($"Creating product in MongoDB: {product.Name} with ID {product.Id}");
             await _productsCollection.InsertOneAsync(product);
             return product;
         }
@@ -59,11 +77,18 @@ namespace ProductCatalogService.DAL
 
         public async Task DeleteProductAsync(string productId)
         {
-            _logger.LogInformation($"Deleting product from MongoDB: {productId}");
-            var result = await _productsCollection.DeleteOneAsync(p => p.Id == productId);
+            if (int.TryParse(productId, out int id))
+            {
+                _logger.LogInformation($"Deleting product from MongoDB: {id}");
+                var result = await _productsCollection.DeleteOneAsync(p => p.Id == id);
 
-            if (result.DeletedCount == 0)
-                throw new Exception($"Product {productId} not found");
+                if (result.DeletedCount == 0)
+                    throw new Exception($"Product {id} not found");
+            }
+            else
+            {
+                throw new Exception($"Invalid product id format: {productId}");
+            }
         }
     }
 }

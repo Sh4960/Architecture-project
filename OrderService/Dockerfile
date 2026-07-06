@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY ["OrderService/OrderService.csproj", "OrderService/"]
+# RUN --network=host dotnet restore "OrderService/OrderService.csproj" # unsupported on Docker Desktop Windows build
 RUN dotnet restore "OrderService/OrderService.csproj"
 COPY . .
 WORKDIR "/src/OrderService"
