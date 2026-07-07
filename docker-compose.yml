@@ -307,17 +307,54 @@ services:
     networks:
       - microservices-network
 
+  rabbitmq:
+    image: rabbitmq:3.11-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    networks:
+      - microservices-network
+
+  seq:
+    image: datalust/seq:latest
+    ports:
+      - "5341:80"
+    environment:
+      - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_ADMINPASSWORD=SeqAdmin123!
+    networks:
+      - microservices-network
+
   order-service:
     build:
       context: .
       dockerfile: ./OrderService/Dockerfile
+    ports:
+      - "5001:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__OrderDbConnection=Server=order-db;Database=OrderDB;User Id=sa;Password=YourStrong!Password;Encrypt=false;
+      - RabbitMq__HostName=rabbitmq
+      - RabbitMq__UserName=guest
+      - RabbitMq__Password=guest
+      - MT_LICENSE=
     depends_on:
       order-db:
         condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      seq:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - microservices-network
 
@@ -342,9 +379,18 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__MongoDbConnection=mongodb://admin:adminpassword@mongo:27017
+      - ConnectionStrings__RedisConnection=redis:6379
       - CONTAINER_NAME=Replica-1
     depends_on:
       - mongo
+      - redis
+      - seq
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - microservices-network
 
@@ -356,9 +402,18 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__MongoDbConnection=mongodb://admin:adminpassword@mongo:27017
+      - ConnectionStrings__RedisConnection=redis:6379
       - CONTAINER_NAME=Replica-2
     depends_on:
       - mongo
+      - redis
+      - seq
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - microservices-network
 
@@ -385,9 +440,23 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__RedisConnection=redis:6379
+      - RabbitMq__HostName=rabbitmq
+      - RabbitMq__UserName=guest
+      - RabbitMq__Password=guest
+      - MT_LICENSE=
     depends_on:
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      seq:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - microservices-network
 
@@ -399,6 +468,21 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
+      - RabbitMq__HostName=rabbitmq
+      - RabbitMq__UserName=guest
+      - RabbitMq__Password=guest
+      - MT_LICENSE=
+    depends_on:
+      rabbitmq:
+        condition: service_started
+      seq:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - microservices-network
 
@@ -418,6 +502,13 @@ services:
       - product-catalog-service-2          # תיקון: עודכן השם של הרפליקה השנייה
       - inventory-service
       - notification-service
+      - seq
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - microservices-network
 

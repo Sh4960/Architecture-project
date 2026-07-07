@@ -26,5 +26,8 @@ RUN dotnet publish "ApiGateway.csproj" -c Release -o /app/publish /p:UseAppHost=
 # שלב 4: יצירת הקונטיינר הסופי שמכיל רק את קבצי הריצה לטובת משקל קל ויעילות
 FROM base AS final
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "ApiGateway.dll"]

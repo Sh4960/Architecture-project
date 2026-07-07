@@ -12,6 +12,9 @@ RUN dotnet publish "NotificationService.csproj" -c Release -o /app/publish /p:Us
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=publish /app/publish .
 EXPOSE 80
 ENTRYPOINT ["dotnet", "NotificationService.dll"]
